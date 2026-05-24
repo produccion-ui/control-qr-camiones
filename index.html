@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Control QR Camiones</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a1a2e;
+      --navy-light: #2a2a4e;
+      --accent: #4a90d9;
+      --success: #27ae60;
+      --warning: #f39c12;
+      --danger: #e74c3c;
+      --gray-1: #f8f9fa;
+      --gray-2: #e9ecef;
+      --gray-3: #dee2e6;
+      --gray-5: #adb5bd;
+      --gray-7: #495057;
+      --gray-9: #212529;
+      --text: #212529;
+      --text-muted: #6c757d;
+      --radius: 10px;
+      --radius-sm: 6px;
+    }
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-1); color: var(--text); -webkit-tap-highlight-color: transparent; }
+    .screen { display: none; flex-direction: column; min-height: 100vh; background: var(--gray-1); }
+    .screen.active { display: flex; }
+    /* ---- HEADER ---- */
+    .header { background: var(--navy); color: #fff; padding: 12px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .header h1 { font-size: 16px; font-weight: 600; flex: 1; }
+    .header .subtitle { font-size: 11px; color: rgba(255,255,255,0.6); }
+    .btn-back { background: none; border: none; color: #fff; font-size: 22px; cursor: pointer; padding: 0 4px; line-height: 1; }
+    .badge { font-size: 11px; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 3px 9px; color: rgba(255,255,255,0.8); }
+    /* ---- BODY ---- */
+    .body { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+    /* ---- CARDS ---- */
+    .card { background: #fff; border: 1px solid var(--gray-3); border-radius: var(--radius); padding: 14px; }
+    .card-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    /* ---- BUTTONS ---- */
+    .btn { border: none; border-radius: var(--radius-sm); padding: 13px 16px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; text-align: center; transition: opacity 0.15s; }
+    .btn:active { opacity: 0.8; }
+    .btn-primary { background: var(--navy); color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-danger-outline { background: #fff; color: var(--danger); border: 1px solid var(--danger); }
+    .btn-secondary { background: var(--gray-2); color: var(--gray-7); border: 1px solid var(--gray-3); }
+    .btn-big { padding: 18px; font-size: 18px; border-radius: var(--radius); }
+    /* ---- FORM ---- */
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    select, input[type="text"], input[type="number"] {
+      width: 100%; padding: 11px 12px; border: 1px solid var(--gray-3); border-radius: var(--radius-sm);
+      font-size: 15px; background: #fff; color: var(--text); appearance: none; outline: none;
+    }
+    select:focus, input:focus { border-color: var(--accent); }
+    /* ---- STATUS BARS ---- */
+    .bar { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; }
+    .bar-success { background: #d4edda; color: #155724; }
+    .bar-warning { background: #fff3cd; color: #856404; }
+    .bar-info    { background: #d1ecf1; color: #0c5460; }
+    .bar-danger  { background: #f8d7da; color: #721c24; }
+    /* ---- STATS ---- */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-card { background: #fff; border: 1px solid var(--gray-3); border-radius: var(--radius); padding: 12px; text-align: center; }
+    .stat-num { font-size: 26px; font-weight: 700; color: var(--navy); }
+    .stat-lbl { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    /* ---- PIN ---- */
+    .pin-display { display: flex; justify-content: center; gap: 12px; margin: 10px 0; }
+    .pin-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--gray-5); transition: background 0.1s; }
+    .pin-dot.filled { background: var(--navy); border-color: var(--navy); }
+    .pin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .pin-key { background: #fff; border: 1px solid var(--gray-3); border-radius: var(--radius-sm); padding: 16px; font-size: 22px; font-weight: 600; cursor: pointer; text-align: center; color: var(--text); transition: background 0.1s; }
+    .pin-key:active { background: var(--gray-2); }
+    /* ---- QR SCAN ---- */
+    .scan-zone { background: #000; border-radius: var(--radius); height: 200px; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .corner { position: absolute; width: 28px; height: 28px; border-color: #fff; border-style: solid; }
+    .corner.tl { top: 16px; left: 16px; border-width: 3px 0 0 3px; }
+    .corner.tr { top: 16px; right: 16px; border-width: 3px 3px 0 0; }
+    .corner.bl { bottom: 16px; left: 16px; border-width: 0 0 3px 3px; }
+    .corner.br { bottom: 16px; right: 16px; border-width: 0 3px 3px 0; }
+    .scan-line { position: absolute; left: 20px; right: 20px; height: 2px; background: #e74c3c; animation: scanAnim 2s linear infinite; }
+    @keyframes scanAnim { 0%{top:15%} 50%{top:78%} 100%{top:15%} }
+    /* ---- TRUCK CARD ---- */
+    .truck-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .truck-icon { width: 50px; height: 50px; background: #d1ecf1; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; }
+    .row-info { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--gray-2); }
+    .row-info:last-child { border-bottom: none; }
+    .row-label { font-size: 13px; color: var(--text-muted); }
+    .row-value { font-size: 13px; font-weight: 600; color: var(--text); text-align: right; }
+    /* ---- TICKET ---- */
+    .ticket { border: 2px dashed var(--gray-3); border-radius: var(--radius); padding: 14px; background: var(--gray-1); }
+    .ticket-title { text-align: center; font-weight: 700; font-size: 13px; border-bottom: 1px dashed var(--gray-3); padding-bottom: 8px; margin-bottom: 10px; color: var(--navy); line-height: 1.4; }
+    .ticket-num { text-align: center; font-size: 26px; font-weight: 800; color: var(--navy); margin: 6px 0; }
+    .ticket-type { text-align: center; margin-bottom: 10px; }
+    .ticket-badge { display: inline-block; background: #d1ecf1; color: #0c5460; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+    .ticket-row { display: flex; justify-content: space-between; font-size: 12px; margin: 4px 0; gap: 8px; }
+    .ticket-lbl { color: var(--text-muted); flex-shrink: 0; }
+    .ticket-val { font-weight: 600; text-align: right; color: var(--text); }
+    .ticket-footer { text-align: center; font-size: 10px; color: var(--text-muted); margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--gray-3); }
+    /* ---- TRIP LIST ---- */
+    .trip-item { padding: 10px 0; border-bottom: 1px solid var(--gray-2); }
+    .trip-item:last-child { border-bottom: none; }
+    .trip-top { display: flex; justify-content: space-between; align-items: center; }
+    .trip-id { font-size: 13px; font-weight: 600; color: var(--text); }
+    .trip-detail { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+    .tag-ok      { background: #d4edda; color: #155724; }
+    .tag-warn    { background: #fff3cd; color: #856404; }
+    .tag-cancel  { background: #f8d7da; color: #721c24; }
+    .tag-pending { background: #d1ecf1; color: #0c5460; }
+    /* ---- FILTERS ---- */
+    .filter-row { display: flex; gap: 8px; }
+    .filter-row select { flex: 1; font-size: 13px; padding: 8px 10px; }
+    /* ---- TOAST ---- */
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--gray-9); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; white-space: nowrap; }
+    #toast.show { opacity: 1; }
+    /* ---- LOADING ---- */
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* ---- LOGIN HERO ---- */
+    .login-hero { background: var(--navy); color: #fff; padding: 28px 20px 20px; text-align: center; }
+    .login-hero .app-name { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .login-hero .obra-name { font-size: 13px; color: rgba(255,255,255,0.6); }
+    /* ---- MISC ---- */
+    .divider { height: 1px; background: var(--gray-2); margin: 4px 0; }
+    .gps-info { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     PANTALLA 1: LOGIN
+     ============================================================ -->
+<div id="screen-login" class="screen active">
+  <div class="login-hero">
+    <div style="font-size:36px;margin-bottom:8px">🚛</div>
+    <div class="app-name">Control QR Camiones</div>
+    <div class="obra-name" id="login-obra-name">Obra Vial</div>
+  </div>
+  <div class="body">
+    <div class="field">
+      <label>Selecciona tu usuario</label>
+      <select id="login-user-select">
+        <option value="">Cargando usuarios...</option>
+      </select>
+    </div>
+    <div class="card" style="text-align:center">
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Ingresa tu PIN de 4 dígitos</div>
+      <div class="pin-display">
+        <div class="pin-dot" id="pd0"></div>
+        <div class="pin-dot" id="pd1"></div>
+        <div class="pin-dot" id="pd2"></div>
+        <div class="pin-dot" id="pd3"></div>
+      </div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-key" onclick="pinPress('1')">1</button>
+      <button class="pin-key" onclick="pinPress('2')">2</button>
+      <button class="pin-key" onclick="pinPress('3')">3</button>
+      <button class="pin-key" onclick="pinPress('4')">4</button>
+      <button class="pin-key" onclick="pinPress('5')">5</button>
+      <button class="pin-key" onclick="pinPress('6')">6</button>
+      <button class="pin-key" onclick="pinPress('7')">7</button>
+      <button class="pin-key" onclick="pinPress('8')">8</button>
+      <button class="pin-key" onclick="pinPress('9')">9</button>
+      <button class="pin-key" style="opacity:0.3" disabled></button>
+      <button class="pin-key" onclick="pinPress('0')">0</button>
+      <button class="pin-key" onclick="pinDelete()">⌫</button>
+    </div>
+    <div id="login-status" style="font-size:13px;text-align:center;color:var(--danger);min-height:18px"></div>
+    <div id="sync-status-login" class="bar bar-info" style="display:none">
+      <span class="spinner"></span> Cargando datos de la obra...
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PANTALLA 2: PRINCIPAL (CAMPO)
+     ============================================================ -->
+<div id="screen-main" class="screen">
+  <div class="header">
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:16px">Campo — Turno activo</div>
+      <div class="subtitle" id="main-user-label">—</div>
+    </div>
+    <button class="badge" style="cursor:pointer;border:none" onclick="logout()">Salir</button>
+  </div>
+  <div class="body">
+    <div id="main-gps-bar" class="bar bar-info" style="display:none">
+      📍 <span id="main-gps-text">Obteniendo GPS...</span>
+    </div>
+    <div id="main-offline-bar" class="bar bar-warning" style="display:none">
+      ⚡ Sin conexión — <span id="main-pending-count">0</span> viajes pendientes de sincronizar
+    </div>
+    <div id="main-sync-bar" class="bar bar-success" style="display:none">
+      ✓ Todo sincronizado con la nube
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-num" id="stat-trips">0</div><div class="stat-lbl">Viajes hoy</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-pending">0</div><div class="stat-lbl">Pendientes sync</div></div>
+    </div>
+    <button class="btn btn-primary btn-big" onclick="goTo('screen-scan')">
+      📷 &nbsp;Nuevo viaje
+    </button>
+    <div>
+      <div class="card-title">ÚLTIMO REGISTRADO</div>
+      <div class="card" id="main-last-trip">
+        <div style="text-align:center;color:var(--text-muted);font-size:13px">Sin viajes registrados hoy</div>
+      </div>
+    </div>
+    <button class="btn btn-secondary" onclick="goTo('screen-office')">📋 Ver todos los viajes del día</button>
+    <button class="btn btn-secondary" onclick="syncNow()" id="btn-sync">☁️ Sincronizar ahora</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     PANTALLA 3: ESCANEO QR
+     ============================================================ -->
+<div id="screen-scan" class="screen">
+  <div class="header">
+    <button class="btn-back" onclick="goTo('screen-main')">←</button>
+    <div><div style="font-weight:700">Escanear camión</div><div class="subtitle">Apunta al código QR</div></div>
+  </div>
+  <div class="body">
+    <div class="bar bar-info">
+      El escáner F2 envía el código automáticamente al campo de texto
+    </div>
+    <div class="scan-zone">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <div class="scan-line"></div>
+      <div style="color:rgba(255,255,255,0.4);font-size:12px">Escáner activo</div>
+    </div>
+    <div class="field">
+      <label>Código QR recibido / entrada manual</label>
+      <input type="text" id="scan-input" placeholder="Ej: CAM-015"
+             oninput="onScanInput(this.value)"
+             autofocus autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+    </div>
+    <div id="scan-status" style="font-size:13px;color:var(--danger);min-height:16px;text-align:center"></div>
+    <button class="btn btn-primary" onclick="lookupTruck()">Buscar camión</button>
+    <div class="divider"></div>
+    <div style="font-size:12px;color:var(--text-muted);text-align:center">Camiones registrados en el sistema:</div>
+    <div id="truck-list-quick" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PANTALLA 4: CONFIRMACIÓN DE CAMIÓN
+     ============================================================ -->
+<div id="screen-truck" class="screen">
+  <div class="header">
+    <button class="btn-back" onclick="goTo('screen-scan')">←</button>
+    <div><div style="font-weight:700">Camión identificado</div><div class="subtitle">Confirma los datos</div></div>
+    <span class="badge" style="background:rgba(39,174,96,0.3)">✓ OK</span>
+  </div>
+  <div class="body">
+    <div class="card">
+      <div class="truck-header">
+        <div class="truck-icon">🚛</div>
+        <div style="flex:1">
+          <div style="font-size:20px;font-weight:800;color:var(--navy)" id="tc-code">—</div>
+          <div style="font-size:12px;color:var(--text-muted)">Código interno</div>
+        </div>
+        <span class="tag tag-ok">Activo</span>
+      </div>
+      <div class="row-info"><span class="row-label">Placa</span><span class="row-value" id="tc-plate">—</span></div>
+      <div class="row-info"><span class="row-label">Suplidor</span><span class="row-value" id="tc-supplier">—</span></div>
+      <div class="row-info"><span class="row-label">Chofer (habitual)</span><span class="row-value" id="tc-driver">—</span></div>
+      <div class="row-info"><span class="row-label">Capacidad</span><span class="row-value" id="tc-capacity">—</span></div>
+      <div class="row-info"><span class="row-label">Viajes hoy</span><span class="row-value" id="tc-trips-today">—</span></div>
+    </div>
+    <div class="bar bar-info" style="font-size:12px">
+      ¿Es este el camión correcto? Confirma antes de continuar.
+    </div>
+    <button class="btn btn-primary" onclick="goTo('screen-form')">Confirmar — registrar viaje</button>
+    <button class="btn btn-secondary" onclick="goTo('screen-scan')">No es este — volver a escanear</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     PANTALLA 5: FORMULARIO DE MOVIMIENTO
+     ============================================================ -->
+<div id="screen-form" class="screen">
+  <div class="header">
+    <button class="btn-back" onclick="goTo('screen-truck')">←</button>
+    <div><div style="font-weight:700">Registrar movimiento</div><div class="subtitle" id="form-truck-label">—</div></div>
+  </div>
+  <div class="body">
+    <div class="field">
+      <label>Tipo de movimiento</label>
+      <select id="f-movement-type"></select>
+    </div>
+    <div class="field">
+      <label>Material</label>
+      <select id="f-material"></select>
+    </div>
+    <div class="field">
+      <label>Origen</label>
+      <select id="f-origin"></select>
+    </div>
+    <div class="field">
+      <label>Destino</label>
+      <select id="f-destination"></select>
+    </div>
+    <div class="field">
+      <label>Chofer (si difiere del habitual)</label>
+      <select id="f-driver"></select>
+    </div>
+    <div class="field">
+      <label>Cantidad estimada (opcional)</label>
+      <input type="number" id="f-quantity" placeholder="Ej: 10.5" step="0.5" min="0">
+    </div>
+    <div class="field">
+      <label>Unidad</label>
+      <select id="f-unit">
+        <option value="m3">m³ (metros cúbicos)</option>
+        <option value="ton">Toneladas</option>
+        <option value="viaje">Viaje completo</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Observaciones (opcional)</label>
+      <input type="text" id="f-notes" placeholder="Ej: camión cargado al 80%">
+    </div>
+    <div class="card" style="padding:10px 12px">
+      <div class="gps-info">📍 <span id="form-gps-status">Obteniendo GPS...</span></div>
+    </div>
+    <button class="btn btn-success" onclick="saveMovement()" id="btn-save-movement">
+      ✓ Guardar y generar ticket
+    </button>
+  </div>
+</div>
+
+<!-- ============================================================
+     PANTALLA 6: TICKET GENERADO
+     ============================================================ -->
+<div id="screen-ticket" class="screen">
+  <div class="header">
+    <div style="font-weight:700;flex:1">Ticket generado</div>
+    <span class="badge" style="background:rgba(39,174,96,0.3)">✓ Listo</span>
+  </div>
+  <div class="body">
+    <div class="bar bar-success">✓ Movimiento registrado correctamente</div>
+    <div class="ticket">
+      <div class="ticket-title" id="tkt-obra-name">OBRA VIAL</div>
+      <div class="ticket-num" id="tkt-number">—</div>
+      <div class="ticket-type"><span class="ticket-badge" id="tkt-type">—</span></div>
+      <div class="ticket-row"><span class="ticket-lbl">Fecha/Hora</span><span class="ticket-val" id="tkt-datetime">—</span></div>
+      <div class="ticket-row"><span class="ticket-lbl">Camión</span><span class="ticket-val" id="tkt-truck">—</span></div>
+      <div class="ticket-row"><span class="ticket-lbl">Placa</span><span class="ticket-val" id="tkt-plate">—</span></div>
+      <div class="ticket-row"><span class="ticket-lbl">Suplidor</span><span class="ticket-val" id="tkt-supplier">—</span></div>
+      <div class="ticket-row"><span class="ticket-lbl">Chofer</span><span class="ticket-val" id="tkt-driver">—</span></div>
+      <div class="ticket-row"><span class="ticket-lbl">Material</span><span class="ticket-val" id="tkt-material">—</span></div>
+      <div class="ticket-row"><span class="ticket-lbl">Origen</span><span class="ticket-val" id="tkt-origin">—</span></div>
+      <div class="ticket-row"><span class="ticket-lbl">Destino</span><span class="ticket-val" id="tkt-destination">—</span></div>
+      <div class="ticket-row"><span class="ticket-lbl">Cantidad</span><span class="ticket-val" id="tkt-quantity">—</span></div>
+      <div class="ticket-row"><span class="ticket-lbl">Listero</span><span class="ticket-val" id="tkt-user">—</span></div>
+      <div class="ticket-footer" id="tkt-footer">—</div>
+    </div>
+    <button class="btn btn-primary" onclick="printTicket()" id="btn-print">🖨️ Imprimir ticket (RawBT)</button>
+    <button class="btn btn-success" onclick="newTrip()">➕ Nuevo viaje</button>
+    <button class="btn btn-danger-outline" onclick="cancelTicket()">✕ Anular este ticket</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     PANTALLA 7: PANEL DE OFICINA
+     ============================================================ -->
+<div id="screen-office" class="screen">
+  <div class="header">
+    <button class="btn-back" onclick="goTo('screen-main')">←</button>
+    <div style="flex:1"><div style="font-weight:700">Panel de oficina</div><div class="subtitle">Movimientos del día</div></div>
+    <button class="badge" style="cursor:pointer;border:none" onclick="loadOfficeData()">↻</button>
+  </div>
+  <div class="body">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-num" id="off-total">0</div><div class="stat-lbl">Total viajes</div></div>
+      <div class="stat-card"><div class="stat-num" id="off-cancelled" style="color:var(--danger)">0</div><div class="stat-lbl">Anulados</div></div>
+    </div>
+    <div class="filter-row">
+      <select id="off-filter-truck" onchange="filterOffice()">
+        <option value="">Todos los camiones</option>
+      </select>
+      <select id="off-filter-status" onchange="filterOffice()">
+        <option value="">Todos los estados</option>
+        <option value="active">Activos</option>
+        <option value="cancelled">Anulados</option>
+      </select>
+    </div>
+    <div id="office-list" class="card" style="padding:8px 14px">
+      <div style="text-align:center;color:var(--text-muted);font-size:13px;padding:12px 0">Cargando movimientos...</div>
+    </div>
+    <button class="btn btn-secondary" onclick="exportCSV()">📥 Exportar CSV</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ================================================================
+// CONFIGURACIÓN — CAMBIAR CON TUS DATOS DE SUPABASE
+// ================================================================
+const CONFIG = {
+  SUPABASE_URL:  'https://mawsexbumsbmyeqgwrha.supabase.co',
+  SUPABASE_KEY:  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hd3NleGJ1bXNibXllcWd3cmhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MDU2MzgsImV4cCI6MjA5NTE4MTYzOH0.nhZ7LNVcgGO_7iGqPO9sswJfomQohlfXXXRGjzYfdVs',
+  OBRA_NAME:     'Obra Vial — Tramo Norte',
+  DEVICE_ID:     getDeviceId(),
+};
+
+// ================================================================
+// ESTADO GLOBAL
+// ================================================================
+const state = {
+  user:         null,   // usuario logueado
+  truck:        null,   // camión escaneado actual
+  movement:     null,   // movimiento en curso
+  ticket:       null,   // último ticket generado
+  gps:          null,   // coordenadas GPS actuales
+  masterData:   { trucks:[], materials:[], locations:[], movementTypes:[], users:[], drivers:[] },
+  todayMovements: [],   // movimientos del día (locales)
+  pin:          '',
+};
+
+// ================================================================
+// SUPABASE CLIENT
+// ================================================================
+let sb = null;
+function initSupabase() {
+  if (CONFIG.SUPABASE_URL.includes('TU-PROYECTO')) return null;
+  try {
+    sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+    return sb;
+  } catch(e) { console.warn('Supabase init failed:', e); return null; }
+}
+
+// ================================================================
+// INDEXEDDB — ALMACENAMIENTO LOCAL
+// ================================================================
+let db = null;
+const DB_NAME = 'qr_camiones_v1';
+const DB_VERSION = 1;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      ['trucks','materials','locations','movement_types','users','drivers'].forEach(s => {
+        if (!d.objectStoreNames.contains(s))
+          d.createObjectStore(s, {keyPath:'id'});
+      });
+      if (!d.objectStoreNames.contains('movements_local')) {
+        const ms = d.createObjectStore('movements_local', {keyPath:'local_id'});
+        ms.createIndex('synced','synced',{unique:false});
+        ms.createIndex('date','date',{unique:false});
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(db); };
+    req.onerror   = e => reject(e);
+  });
+}
+
+function dbPut(store, item) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).put(item);
+    tx.oncomplete = resolve;
+    tx.onerror = reject;
+  });
+}
+
+function dbGetAll(store) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = reject;
+  });
+}
+
+function dbGet(store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = reject;
+  });
+}
+
+// ================================================================
+// NAVEGACIÓN
+// ================================================================
+function goTo(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+  window.scrollTo(0,0);
+  if (screenId === 'screen-scan')   onEnterScan();
+  if (screenId === 'screen-form')   onEnterForm();
+  if (screenId === 'screen-main')   onEnterMain();
+  if (screenId === 'screen-office') loadOfficeData();
+}
+
+// ================================================================
+// UTILIDADES
+// ================================================================
+function toast(msg, duration=2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+function getDeviceId() {
+  let id = localStorage.getItem('device_id');
+  if (!id) { id = 'DEV-' + Math.random().toString(36).substr(2,9).toUpperCase(); localStorage.setItem('device_id', id); }
+  return id;
+}
+
+function fmtDatetime(d) {
+  const dt = d ? new Date(d) : new Date();
+  return dt.toLocaleDateString('es-DO') + ' ' + dt.toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'});
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0,10);
+}
+
+function generateLocalId() {
+  return crypto.randomUUID ? crypto.randomUUID()
+    : 'xxxx-xxxx-xxxx'.replace(/x/g, () => Math.floor(Math.random()*16).toString(16));
+}
+
+function generateTicketNumber() {
+  const dateKey = todayStr();
+  const storedDate = localStorage.getItem('tkt_date');
+  let counter = parseInt(localStorage.getItem('tkt_counter') || '0');
+  if (storedDate !== dateKey) { counter = 0; localStorage.setItem('tkt_date', dateKey); }
+  counter++;
+  localStorage.setItem('tkt_counter', counter);
+  return 'TKT-' + dateKey.replace(/-/g,'') + '-' + String(counter).padStart(4,'0');
+}
+
+// ================================================================
+// GPS
+// ================================================================
+function startGPS() {
+  if (!navigator.geolocation) { toast('GPS no disponible en este dispositivo'); return; }
+  navigator.geolocation.watchPosition(
+    pos => {
+      state.gps = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+      const el = document.getElementById('main-gps-bar');
+      if (el) { el.style.display='flex'; document.getElementById('main-gps-text').textContent = `GPS activo · ±${Math.round(pos.coords.accuracy)}m`; }
+    },
+    err => console.warn('GPS error:', err),
+    { enableHighAccuracy: true, maximumAge: 10000 }
+  );
+}
+
+// ================================================================
+// CARGA DE DATOS MAESTROS
+// ================================================================
+async function loadMasterData() {
+  // Primero cargar de IndexedDB (instantáneo)
+  const caches = ['trucks','materials','locations','movement_types','users','drivers'];
+  for (const s of caches) {
+    const items = await dbGetAll(s);
+    if (items.length > 0) state.masterData[s.replace('_',' ').replace(' ','_')] = items;
+  }
+  state.masterData.trucks        = await dbGetAll('trucks')        || [];
+  state.masterData.materials     = await dbGetAll('materials')     || [];
+  state.masterData.locations     = await dbGetAll('locations')     || [];
+  state.masterData.movementTypes = await dbGetAll('movement_types')|| [];
+  state.masterData.users         = await dbGetAll('users')         || [];
+  state.masterData.drivers       = await dbGetAll('drivers')       || [];
+
+  // Luego actualizar desde Supabase si hay conexión
+  if (sb && navigator.onLine) {
+    try {
+      const tables = [
+        { name:'trucks',         store:'trucks' },
+        { name:'materials',      store:'materials' },
+        { name:'locations',      store:'locations' },
+        { name:'movement_types', store:'movement_types' },
+        { name:'users',          store:'users' },
+        { name:'drivers',        store:'drivers' },
+      ];
+      for (const t of tables) {
+        const { data, error } = await sb.from(t.name).select('*').eq('active', true);
+        if (error) continue;
+        for (const item of data) await dbPut(t.store, item);
+        if (t.store === 'trucks')         state.masterData.trucks        = data;
+        if (t.store === 'materials')      state.masterData.materials     = data;
+        if (t.store === 'locations')      state.masterData.locations     = data;
+        if (t.store === 'movement_types') state.masterData.movementTypes = data;
+        if (t.store === 'users')          state.masterData.users         = data;
+        if (t.store === 'drivers')        state.masterData.drivers       = data;
+      }
+    } catch(e) { console.warn('Error loading from Supabase:', e); }
+  }
+
+  populateLoginUsers();
+  return state.masterData;
+}
+
+// ================================================================
+// LOGIN
+// ================================================================
+function populateLoginUsers() {
+  const sel = document.getElementById('login-user-select');
+  sel.innerHTML = '<option value="">Selecciona usuario...</option>';
+  (state.masterData.users || []).forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.id;
+    opt.textContent = u.name + ' (' + u.role + ')';
+    sel.appendChild(opt);
+  });
+  // Usuarios de demo si no hay datos
+  if (!state.masterData.users.length) {
+    sel.innerHTML = '<option value="demo-1">Juan Rodríguez (listero)</option><option value="demo-2">Admin</option>';
+    state.masterData.users = [
+      {id:'demo-1',name:'Juan Rodríguez',pin_hash:'1111',role:'listero'},
+      {id:'demo-2',name:'Administrador',pin_hash:'0000',role:'admin'},
+    ];
+  }
+}
+
+function pinPress(digit) {
+  if (state.pin.length >= 4) return;
+  state.pin += digit;
+  updatePinDisplay();
+  if (state.pin.length === 4) setTimeout(tryLogin, 200);
+}
+
+function pinDelete() {
+  state.pin = state.pin.slice(0,-1);
+  updatePinDisplay();
+  document.getElementById('login-status').textContent = '';
+}
+
+function updatePinDisplay() {
+  for (let i=0; i<4; i++) {
+    document.getElementById('pd'+i).classList.toggle('filled', i < state.pin.length);
+  }
+}
+
+function tryLogin() {
+  const userId = document.getElementById('login-user-select').value;
+  if (!userId) { document.getElementById('login-status').textContent = 'Selecciona un usuario'; state.pin=''; updatePinDisplay(); return; }
+  const user = state.masterData.users.find(u => u.id === userId);
+  if (!user) { document.getElementById('login-status').textContent = 'Usuario no encontrado'; state.pin=''; updatePinDisplay(); return; }
+  if (user.pin_hash !== state.pin) {
+    document.getElementById('login-status').textContent = 'PIN incorrecto';
+    state.pin=''; updatePinDisplay(); return;
+  }
+  state.user = user;
+  state.pin  = '';
+  updatePinDisplay();
+  document.getElementById('login-status').textContent = '';
+  toast('Bienvenido, ' + user.name);
+  goTo('screen-main');
+}
+
+function logout() {
+  state.user = null;
+  state.pin  = '';
+  updatePinDisplay();
+  goTo('screen-login');
+}
+
+// ================================================================
+// PANTALLA PRINCIPAL
+// ================================================================
+function onEnterMain() {
+  if (state.user) document.getElementById('main-user-label').textContent = state.user.name + ' — ' + new Date().toLocaleDateString('es-DO');
+  updateMainStats();
+  startGPS();
+  checkSync();
+}
+
+async function updateMainStats() {
+  const movements = await dbGetAll('movements_local');
+  const today = todayStr();
+  const todayMovs = movements.filter(m => m.date === today && m.status !== 'cancelled');
+  const pending   = movements.filter(m => !m.synced);
+  document.getElementById('stat-trips').textContent   = todayMovs.length;
+  document.getElementById('stat-pending').textContent = pending.length;
+  state.todayMovements = todayMovs;
+
+  if (pending.length > 0) {
+    document.getElementById('main-offline-bar').style.display = 'flex';
+    document.getElementById('main-pending-count').textContent = pending.length;
+    document.getElementById('main-sync-bar').style.display = 'none';
+  } else {
+    document.getElementById('main-offline-bar').style.display = 'none';
+    document.getElementById('main-sync-bar').style.display = 'flex';
+    setTimeout(() => { document.getElementById('main-sync-bar').style.display='none'; }, 3000);
+  }
+
+  // Último viaje
+  if (todayMovs.length > 0) {
+    const last = todayMovs[todayMovs.length-1];
+    document.getElementById('main-last-trip').innerHTML =
+      `<div class="trip-top">
+         <span class="trip-id">${last.ticket_number} · ${last.truck_code}</span>
+         <span class="tag ${last.synced?'tag-ok':'tag-pending'}">${last.synced?'Sincronizado':'Pendiente'}</span>
+       </div>
+       <div class="trip-detail">${last.material_name} · ${last.origin_name} → ${last.destination_name}</div>
+       <div class="trip-detail" style="margin-top:2px">${fmtDatetime(last.departure_time)}</div>`;
+  }
+}
+
+// ================================================================
+// PANTALLA ESCANEO
+// ================================================================
+function onEnterScan() {
+  document.getElementById('scan-input').value = '';
+  document.getElementById('scan-status').textContent = '';
+  setTimeout(() => document.getElementById('scan-input').focus(), 300);
+
+  // Accesos rápidos a camiones
+  const container = document.getElementById('truck-list-quick');
+  container.innerHTML = '';
+  (state.masterData.trucks || []).slice(0,8).forEach(t => {
+    const btn = document.createElement('button');
+    btn.style.cssText = 'background:#fff;border:1px solid var(--gray-3);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-weight:600;color:var(--navy)';
+    btn.textContent = t.code;
+    btn.onclick = () => { document.getElementById('scan-input').value = t.qr_code; lookupTruck(); };
+    container.appendChild(btn);
+  });
+}
+
+function onScanInput(val) {
+  // El escáner F2 envía Enter al final — detectamos eso
+  if (val.includes('\n') || val.includes('\r')) {
+    document.getElementById('scan-input').value = val.trim();
+    lookupTruck();
+  }
+}
+
+function lookupTruck() {
+  const code = document.getElementById('scan-input').value.trim().toUpperCase();
+  if (!code) { document.getElementById('scan-status').textContent = 'Ingresa o escanea un código'; return; }
+  const truck = state.masterData.trucks.find(t =>
+    t.qr_code.toUpperCase() === code ||
+    t.code.toUpperCase()    === code ||
+    t.plate.toUpperCase()   === code
+  );
+  if (!truck) {
+    document.getElementById('scan-status').textContent = '✕ Camión "' + code + '" no encontrado en el sistema';
+    toast('Camión no encontrado');
+    return;
+  }
+  state.truck = truck;
+  fillTruckScreen(truck);
+  goTo('screen-truck');
+}
+
+// ================================================================
+// PANTALLA CONFIRMACIÓN CAMIÓN
+// ================================================================
+function fillTruckScreen(truck) {
+  document.getElementById('tc-code').textContent     = truck.code;
+  document.getElementById('tc-plate').textContent    = truck.plate;
+  document.getElementById('tc-capacity').textContent = truck.capacity_m3 ? truck.capacity_m3 + ' m³' : 'N/D';
+
+  const supplier = state.masterData.trucks && truck.supplier_id
+    ? (state.masterData.trucks.find(t=>t.id===truck.id)||{})
+    : null;
+  document.getElementById('tc-supplier').textContent = truck.supplier_name || '—';
+  document.getElementById('tc-driver').textContent   = truck.driver_name   || '—';
+
+  // Contar viajes hoy
+  dbGetAll('movements_local').then(movs => {
+    const today = todayStr();
+    const count = movs.filter(m => m.truck_id === truck.id && m.date === today && m.status !== 'cancelled').length;
+    document.getElementById('tc-trips-today').textContent = count + ' viaje' + (count!==1?'s':'');
+  });
+}
+
+// ================================================================
+// PANTALLA FORMULARIO
+// ================================================================
+function onEnterForm() {
+  if (state.truck) document.getElementById('form-truck-label').textContent = state.truck.code + ' · ' + state.truck.plate;
+
+  // Poblar selects
+  fillSelect('f-movement-type', state.masterData.movementTypes || [], 'name');
+  fillSelect('f-material',      state.masterData.materials     || [], 'name');
+  fillSelect('f-origin',        state.masterData.locations     || [], 'name');
+  fillSelect('f-destination',   state.masterData.locations     || [], 'name');
+
+  // Choferes
+  const driverSel = document.getElementById('f-driver');
+  driverSel.innerHTML = '<option value="">— Mismo del camión —</option>';
+  (state.masterData.drivers || []).forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.name;
+    if (state.truck && d.id === state.truck.default_driver_id) opt.selected = true;
+    driverSel.appendChild(opt);
+  });
+
+  // GPS
+  if (state.gps) {
+    document.getElementById('form-gps-status').textContent =
+      state.gps.lat.toFixed(5) + '°N, ' + Math.abs(state.gps.lng).toFixed(5) + '°O · ±' + Math.round(state.gps.accuracy) + 'm';
+  } else {
+    navigator.geolocation && navigator.geolocation.getCurrentPosition(pos => {
+      state.gps = {lat:pos.coords.latitude, lng:pos.coords.longitude, accuracy:pos.coords.accuracy};
+      document.getElementById('form-gps-status').textContent =
+        pos.coords.latitude.toFixed(5) + '°N, ' + Math.abs(pos.coords.longitude).toFixed(5) + '°O';
+    });
+  }
+}
+
+function fillSelect(selectId, items, labelField) {
+  const sel = document.getElementById(selectId);
+  sel.innerHTML = '<option value="">Selecciona...</option>';
+  items.forEach(item => {
+    const opt = document.createElement('option');
+    opt.value = item.id;
+    opt.textContent = item[labelField];
+    sel.appendChild(opt);
+  });
+}
+
+// ================================================================
+// GUARDAR MOVIMIENTO
+// ================================================================
+async function saveMovement() {
+  const movType   = document.getElementById('f-movement-type').value;
+  const material  = document.getElementById('f-material').value;
+  const origin    = document.getElementById('f-origin').value;
+  const dest      = document.getElementById('f-destination').value;
+
+  if (!movType || !material || !origin || !dest) { toast('Completa todos los campos obligatorios'); return; }
+  if (origin === dest) { toast('Origen y destino no pueden ser iguales'); return; }
+
+  const btn = document.getElementById('btn-save-movement');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Guardando...';
+
+  const movTypeObj  = state.masterData.movementTypes.find(m=>m.id===movType)  || {};
+  const materialObj = state.masterData.materials.find(m=>m.id===material)     || {};
+  const originObj   = state.masterData.locations.find(l=>l.id===origin)       || {};
+  const destObj     = state.masterData.locations.find(l=>l.id===dest)         || {};
+  const driverId    = document.getElementById('f-driver').value || state.truck?.default_driver_id;
+  const driverObj   = state.masterData.drivers.find(d=>d.id===driverId)       || {};
+  const quantity    = parseFloat(document.getElementById('f-quantity').value) || null;
+  const unit        = document.getElementById('f-unit').value;
+  const notes       = document.getElementById('f-notes').value.trim();
+  const ticketNum   = generateTicketNumber();
+  const localId     = generateLocalId();
+  const now         = new Date().toISOString();
+
+  const movement = {
+    local_id:         localId,
+    truck_id:         state.truck.id,
+    truck_code:       state.truck.code,
+    truck_plate:      state.truck.plate,
+    supplier_name:    state.truck.supplier_name || '—',
+    driver_id:        driverId || null,
+    driver_name:      driverObj.name || state.truck.driver_name || '—',
+    movement_type_id: movType,
+    movement_type_name: movTypeObj.name || '—',
+    material_id:      material,
+    material_name:    materialObj.name || '—',
+    origin_id:        origin,
+    origin_name:      originObj.name || '—',
+    destination_id:   dest,
+    destination_name: destObj.name || '—',
+    user_id:          state.user?.id || 'demo',
+    user_name:        state.user?.name || 'Usuario',
+    quantity,
+    unit,
+    notes,
+    ticket_number:    ticketNum,
+    departure_time:   now,
+    gps_lat:          state.gps?.lat   || null,
+    gps_lng:          state.gps?.lng   || null,
+    gps_accuracy:     state.gps?.accuracy || null,
+    device_id:        CONFIG.DEVICE_ID,
+    status:           'active',
+    date:             todayStr(),
+    synced:           false,
+    created_at:       now,
+  };
+
+  await dbPut('movements_local', movement);
+  state.movement = movement;
+  state.ticket   = { ticket_number: ticketNum, movement };
+
+  btn.disabled = false; btn.innerHTML = '✓ Guardar y generar ticket';
+
+  fillTicketScreen(movement);
+  goTo('screen-ticket');
+
+  // Intentar sync inmediato
+  syncNow(true);
+}
+
+// ================================================================
+// PANTALLA TICKET
+// ================================================================
+function fillTicketScreen(m) {
+  document.getElementById('tkt-obra-name').textContent  = CONFIG.OBRA_NAME;
+  document.getElementById('tkt-number').textContent     = m.ticket_number;
+  document.getElementById('tkt-type').textContent       = m.movement_type_name;
+  document.getElementById('tkt-datetime').textContent   = fmtDatetime(m.departure_time);
+  document.getElementById('tkt-truck').textContent      = m.truck_code;
+  document.getElementById('tkt-plate').textContent      = m.truck_plate;
+  document.getElementById('tkt-supplier').textContent   = m.supplier_name;
+  document.getElementById('tkt-driver').textContent     = m.driver_name;
+  document.getElementById('tkt-material').textContent   = m.material_name;
+  document.getElementById('tkt-origin').textContent     = m.origin_name;
+  document.getElementById('tkt-destination').textContent= m.destination_name;
+  document.getElementById('tkt-quantity').textContent   = m.quantity ? m.quantity + ' ' + m.unit : 'N/D';
+  document.getElementById('tkt-user').textContent       = m.user_name;
+  document.getElementById('tkt-footer').textContent     = 'ID: ' + m.local_id.slice(0,16).toUpperCase();
+}
+
+function printTicket() {
+  const m = state.movement;
+  if (!m) return;
+  // Texto plano para RawBT
+  const txt = [
+    '================================',
+    CONFIG.OBRA_NAME,
+    'CONTROL DE MOVIMIENTO CAMIONES',
+    '================================',
+    'TICKET: ' + m.ticket_number,
+    'TIPO:   ' + m.movement_type_name,
+    '--------------------------------',
+    'FECHA:  ' + fmtDatetime(m.departure_time),
+    'CAMION: ' + m.truck_code,
+    'PLACA:  ' + m.truck_plate,
+    'SUPLID: ' + m.supplier_name,
+    'CHOFER: ' + m.driver_name,
+    'MATRL:  ' + m.material_name,
+    'ORIGEN: ' + m.origin_name,
+    'DEST:   ' + m.destination_name,
+    'CANT:   ' + (m.quantity ? m.quantity + ' ' + m.unit : 'N/D'),
+    'LISTER: ' + m.user_name,
+    '--------------------------------',
+    'ID: ' + m.local_id.slice(0,16).toUpperCase(),
+    '================================',
+    '', '', '',
+  ].join('\n');
+
+  // Intentar RawBT via intent URL
+  const encoded = encodeURIComponent(txt);
+  const intentUrl = 'rawbt://print?text=' + encoded;
+
+  // Crear un link temporal y hacer click
+  const a = document.createElement('a');
+  a.href = intentUrl;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  toast('Enviando a impresora...');
+}
+
+function newTrip() {
+  state.truck = null;
+  state.movement = null;
+  goTo('screen-scan');
+}
+
+async function cancelTicket() {
+  if (!state.movement) return;
+  const reason = prompt('Motivo de anulación:');
+  if (!reason) return;
+  const m = await dbGet('movements_local', state.movement.local_id);
+  if (m) {
+    m.status = 'cancelled';
+    m.cancelled_reason = reason;
+    m.cancelled_at = new Date().toISOString();
+    m.synced = false;
+    await dbPut('movements_local', m);
+    toast('Ticket anulado');
+    goTo('screen-main');
+  }
+}
+
+// ================================================================
+// PANEL OFICINA
+// ================================================================
+let officeMovements = [];
+
+async function loadOfficeData() {
+  const movements = await dbGetAll('movements_local');
+  const today = todayStr();
+  officeMovements = movements.filter(m => m.date === today);
+  officeMovements.sort((a,b) => new Date(b.departure_time) - new Date(a.departure_time));
+
+  const total     = officeMovements.filter(m=>m.status!=='cancelled').length;
+  const cancelled = officeMovements.filter(m=>m.status==='cancelled').length;
+  document.getElementById('off-total').textContent     = total;
+  document.getElementById('off-cancelled').textContent = cancelled;
+
+  // Poblar filtro de camiones
+  const truckFilter = document.getElementById('off-filter-truck');
+  const currentVal  = truckFilter.value;
+  truckFilter.innerHTML = '<option value="">Todos los camiones</option>';
+  const codes = [...new Set(officeMovements.map(m=>m.truck_code))];
+  codes.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    if (c === currentVal) opt.selected = true;
+    truckFilter.appendChild(opt);
+  });
+
+  renderOfficeList(officeMovements);
+}
+
+function filterOffice() {
+  const truckFilter  = document.getElementById('off-filter-truck').value;
+  const statusFilter = document.getElementById('off-filter-status').value;
+  let filtered = officeMovements;
+  if (truckFilter)  filtered = filtered.filter(m => m.truck_code === truckFilter);
+  if (statusFilter) filtered = filtered.filter(m => m.status     === statusFilter);
+  renderOfficeList(filtered);
+}
+
+function renderOfficeList(movements) {
+  const container = document.getElementById('office-list');
+  if (!movements.length) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:16px 0">Sin movimientos para mostrar</div>';
+    return;
+  }
+  container.innerHTML = movements.map(m => `
+    <div class="trip-item">
+      <div class="trip-top">
+        <span class="trip-id">${m.ticket_number} · ${m.truck_code}</span>
+        <span class="tag ${m.status==='cancelled'?'tag-cancel':m.synced?'tag-ok':'tag-pending'}">
+          ${m.status==='cancelled'?'Anulado':m.synced?'Sync':'Pendiente'}
+        </span>
+      </div>
+      <div class="trip-detail">${m.material_name} · ${m.origin_name} → ${m.destination_name}</div>
+      <div class="trip-detail">${fmtDatetime(m.departure_time)} · ${m.user_name}</div>
+    </div>
+  `).join('');
+}
+
+function exportCSV() {
+  const headers = ['Ticket','Camion','Placa','Suplidor','Chofer','Material','Origen','Destino','Cantidad','Unidad','Fecha','Listero','Estado'];
+  const rows = officeMovements.map(m => [
+    m.ticket_number, m.truck_code, m.truck_plate, m.supplier_name, m.driver_name,
+    m.material_name, m.origin_name, m.destination_name,
+    m.quantity||'', m.unit||'', fmtDatetime(m.departure_time), m.user_name, m.status
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'movimientos_' + todayStr() + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  toast('CSV exportado');
+}
+
+// ================================================================
+// SINCRONIZACIÓN CON SUPABASE
+// ================================================================
+async function syncNow(silent=false) {
+  if (!sb || !navigator.onLine) {
+    if (!silent) toast('Sin conexión — se sincronizará automáticamente');
+    return;
+  }
+  const movements = await dbGetAll('movements_local');
+  const pending   = movements.filter(m => !m.synced);
+  if (!pending.length) { if (!silent) toast('Todo ya está sincronizado'); return; }
+
+  if (!silent) document.getElementById('btn-sync').innerHTML = '<span class="spinner"></span> Sincronizando...';
+
+  let synced = 0;
+  for (const m of pending) {
+    try {
+      // Insertar movimiento
+      const movPayload = {
+        local_id:         m.local_id,
+        truck_id:         m.truck_id,
+        driver_id:        m.driver_id,
+        movement_type_id: m.movement_type_id,
+        material_id:      m.material_id,
+        origin_id:        m.origin_id,
+        destination_id:   m.destination_id,
+        user_id:          m.user_id !== 'demo' ? m.user_id : null,
+        quantity:         m.quantity,
+        unit:             m.unit,
+        notes:            m.notes,
+        departure_time:   m.departure_time,
+        gps_lat:          m.gps_lat,
+        gps_lng:          m.gps_lng,
+        gps_accuracy:     m.gps_accuracy,
+        status:           m.status,
+        cancelled_reason: m.cancelled_reason || null,
+        cancelled_at:     m.cancelled_at || null,
+        device_id:        m.device_id,
+      };
+      const { data: movData, error: movErr } = await sb.from('movements').upsert(movPayload).select().single();
+      if (movErr) { console.error('Sync movement error:', movErr); continue; }
+
+      // Insertar ticket
+      const ticketPayload = {
+        ticket_number: m.ticket_number,
+        movement_id:   movData.id,
+        printed_at:    m.printed_at || null,
+        status:        m.status,
+        cancelled_reason: m.cancelled_reason || null,
+      };
+      const { error: tktErr } = await sb.from('tickets').upsert(ticketPayload);
+      if (tktErr) console.warn('Ticket sync error:', tktErr);
+
+      // Marcar como sincronizado en local
+      m.synced = true;
+      await dbPut('movements_local', m);
+      synced++;
+    } catch(e) { console.error('Sync error:', e); }
+  }
+
+  if (!silent) document.getElementById('btn-sync').innerHTML = '☁️ Sincronizar ahora';
+
+  if (synced > 0) {
+    toast('✓ ' + synced + ' movimiento' + (synced>1?'s':' ') + ' sincronizado' + (synced>1?'s':''));
+    updateMainStats();
+  }
+}
+
+function checkSync() {
+  if (navigator.onLine) syncNow(true);
+}
+
+// ================================================================
+// INICIALIZACIÓN
+// ================================================================
+async function init() {
+  document.getElementById('login-obra-name').textContent = CONFIG.OBRA_NAME;
+  document.getElementById('tkt-obra-name').textContent   = CONFIG.OBRA_NAME;
+
+  await openDB();
+  initSupabase();
+
+  const syncBar = document.getElementById('sync-status-login');
+  syncBar.style.display = 'flex';
+  await loadMasterData();
+  syncBar.style.display = 'none';
+
+  // Registro del Service Worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+      .then(() => console.log('SW registrado'))
+      .catch(e => console.warn('SW error:', e));
+  }
+
+  // Auto-sync cada 60 segundos
+  setInterval(() => { if (navigator.onLine) syncNow(true); }, 60000);
+}
+
+window.addEventListener('load', init);
+window.addEventListener('online',  () => { syncNow(true); toast('Conexión restaurada — sincronizando...'); });
+window.addEventListener('offline', () => toast('Sin conexión — los datos se guardan localmente'));
+</script>
+</body>
+</html>
