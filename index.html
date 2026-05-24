@@ -425,7 +425,7 @@ const state = {
   movement:     null,   // movimiento en curso
   ticket:       null,   // último ticket generado
   gps:          null,   // coordenadas GPS actuales
-  masterData:   { trucks:[], materials:[], locations:[], movementTypes:[], users:[], drivers:[] },
+  masterData:   { trucks:[], materials:[], locations:[], movementTypes:[], users:[], drivers:[], suppliers:[] },
   todayMovements: [],   // movimientos del día (locales)
   pin:          '',
 };
@@ -447,14 +447,14 @@ function initSupabase() {
 // ================================================================
 let db = null;
 const DB_NAME = 'qr_camiones_v1';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = e => {
       const d = e.target.result;
-      ['trucks','materials','locations','movement_types','users','drivers'].forEach(s => {
+      ['trucks','materials','locations','movement_types','users','drivers','suppliers'].forEach(s => {
         if (!d.objectStoreNames.contains(s))
           d.createObjectStore(s, {keyPath:'id'});
       });
@@ -592,9 +592,13 @@ async function loadMasterData() {
         { name:'movement_types', store:'movement_types' },
         { name:'users',          store:'users' },
         { name:'drivers',        store:'drivers' },
+        { name:'suppliers',      store:'suppliers' },
       ];
       for (const t of tables) {
-        const { data, error } = await sb.from(t.name).select('*').eq('active', true);
+        const q = t.name === 'suppliers'
+          ? sb.from(t.name).select('*').eq('active', true)
+          : sb.from(t.name).select('*').eq('active', true);
+        const { data, error } = await q;
         if (error) continue;
         for (const item of data) await dbPut(t.store, item);
         if (t.store === 'trucks')         state.masterData.trucks        = data;
@@ -603,6 +607,7 @@ async function loadMasterData() {
         if (t.store === 'movement_types') state.masterData.movementTypes = data;
         if (t.store === 'users')          state.masterData.users         = data;
         if (t.store === 'drivers')        state.masterData.drivers       = data;
+        if (t.store === 'suppliers')      state.masterData.suppliers     = data;
       }
     } catch(e) { console.warn('Error loading from Supabase:', e); }
   }
@@ -772,11 +777,14 @@ function fillTruckScreen(truck) {
   document.getElementById('tc-plate').textContent    = truck.plate;
   document.getElementById('tc-capacity').textContent = truck.capacity_m3 ? truck.capacity_m3 + ' m³' : 'N/D';
 
-  const supplier = state.masterData.trucks && truck.supplier_id
-    ? (state.masterData.trucks.find(t=>t.id===truck.id)||{})
+  const supplierObj = truck.supplier_id
+    ? (state.masterData.suppliers || []).find(s => s.id === truck.supplier_id)
     : null;
-  document.getElementById('tc-supplier').textContent = truck.supplier_name || '—';
-  document.getElementById('tc-driver').textContent   = truck.driver_name   || '—';
+  const driverObj2  = truck.default_driver_id
+    ? (state.masterData.drivers || []).find(d => d.id === truck.default_driver_id)
+    : null;
+  document.getElementById('tc-supplier').textContent = supplierObj?.name || truck.supplier_name || '—';
+  document.getElementById('tc-driver').textContent   = driverObj2?.name  || truck.driver_name   || '—';
 
   // Contar viajes hoy
   dbGetAll('movements_local').then(movs => {
@@ -866,7 +874,7 @@ async function saveMovement() {
     truck_id:         state.truck.id,
     truck_code:       state.truck.code,
     truck_plate:      state.truck.plate,
-    supplier_name:    state.truck.supplier_name || '—',
+    supplier_name:    ((state.masterData.suppliers||[]).find(s=>s.id===state.truck.supplier_id))?.name || state.truck.supplier_name || '—',
     driver_id:        driverId || null,
     driver_name:      driverObj.name || state.truck.driver_name || '—',
     movement_type_id: movType,
