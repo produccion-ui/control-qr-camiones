@@ -117,6 +117,43 @@
     .tag-pending { background: #d1ecf1; color: #0c5460; }
     /* ---- FILTERS ---- */
     .filter-row { display: flex; gap: 8px; }
+    /* ---- REPORTS ---- */
+    .date-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+    .date-tab { background: #fff; border: 1px solid var(--gray-3); border-radius: 20px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: all 0.15s; }
+    .date-tab.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+    .report-tabs { display: flex; border-bottom: 2px solid var(--gray-3); margin-bottom: 12px; }
+    .report-tab { flex: 1; padding: 9px 4px; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+    .report-tab.active { color: var(--navy); border-bottom-color: var(--navy); }
+    .stats-grid-4 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-card-sm { background: #fff; border: 1px solid var(--gray-3); border-radius: var(--radius); padding: 10px 12px; }
+    .stat-card-sm .stat-num { font-size: 22px; font-weight: 700; color: var(--navy); }
+    .stat-card-sm .stat-lbl { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+    .stat-card-sm.accent-green .stat-num { color: var(--success); }
+    .stat-card-sm.accent-red   .stat-num { color: var(--danger); }
+    .stat-card-sm.accent-blue  .stat-num { color: var(--accent); }
+    .summary-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--gray-2); gap: 8px; }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .summary-sub  { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+    .summary-count { text-align: right; flex-shrink: 0; }
+    .summary-count .num { font-size: 18px; font-weight: 700; color: var(--navy); }
+    .summary-count .lbl { font-size: 10px; color: var(--text-muted); }
+    .bar-chart-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .bar-chart-label { font-size: 12px; color: var(--text); width: 80px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .bar-chart-track { flex: 1; background: var(--gray-2); border-radius: 4px; height: 10px; }
+    .bar-chart-fill  { background: var(--accent); border-radius: 4px; height: 10px; transition: width 0.4s; }
+    .bar-chart-val   { font-size: 12px; font-weight: 600; color: var(--text); width: 28px; text-align: right; flex-shrink: 0; }
+    .report-loading { text-align: center; color: var(--text-muted); font-size: 13px; padding: 24px 0; }
+    .custom-range { display: flex; gap: 8px; align-items: center; }
+    .custom-range input[type="date"] { flex: 1; font-size: 13px; padding: 8px 10px; }
+    .trip-item-full { padding: 10px 0; border-bottom: 1px solid var(--gray-2); }
+    .trip-item-full:last-child { border-bottom: none; }
+    .trip-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+    .trip-tkt { font-size: 12px; font-weight: 700; color: var(--navy); }
+    .trip-time { font-size: 11px; color: var(--text-muted); }
+    .trip-truck { font-size: 13px; font-weight: 600; color: var(--text); }
+    .trip-route { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+    .trip-meta  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
     .filter-row select { flex: 1; font-size: 13px; padding: 8px 10px; }
     /* ---- TOAST ---- */
     #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--gray-9); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; white-space: nowrap; }
@@ -377,27 +414,79 @@
 <div id="screen-office" class="screen">
   <div class="header">
     <button class="btn-back" onclick="goTo('screen-main')">←</button>
-    <div style="flex:1"><div style="font-weight:700">Panel de oficina</div><div class="subtitle">Movimientos del día</div></div>
-    <button class="badge" style="cursor:pointer;border:none" onclick="loadOfficeData()">↻</button>
+    <div style="flex:1"><div style="font-weight:700">Reportes</div><div class="subtitle" id="rpt-subtitle">Cargando...</div></div>
+    <button class="badge" style="cursor:pointer;border:none;font-size:14px" onclick="loadOfficeData()">↻</button>
   </div>
   <div class="body">
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-num" id="off-total">0</div><div class="stat-lbl">Total viajes</div></div>
-      <div class="stat-card"><div class="stat-num" id="off-cancelled" style="color:var(--danger)">0</div><div class="stat-lbl">Anulados</div></div>
+
+    <!-- SELECTOR DE FECHA -->
+    <div class="card" style="padding:10px 12px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px">Período</div>
+      <div class="date-tabs">
+        <button class="date-tab active" data-range="today"   onclick="setDateRange('today')">Hoy</button>
+        <button class="date-tab"        data-range="yesterday" onclick="setDateRange('yesterday')">Ayer</button>
+        <button class="date-tab"        data-range="week"    onclick="setDateRange('week')">7 días</button>
+        <button class="date-tab"        data-range="month"   onclick="setDateRange('month')">30 días</button>
+        <button class="date-tab"        data-range="custom"  onclick="setDateRange('custom')">Rango</button>
+      </div>
+      <div id="custom-range-row" class="custom-range" style="display:none;margin-top:10px">
+        <input type="date" id="rpt-date-from">
+        <span style="font-size:12px;color:var(--text-muted)">a</span>
+        <input type="date" id="rpt-date-to">
+        <button class="btn btn-primary" style="width:auto;padding:8px 14px;font-size:13px" onclick="loadOfficeData()">OK</button>
+      </div>
     </div>
-    <div class="filter-row">
-      <select id="off-filter-truck" onchange="filterOffice()">
-        <option value="">Todos los camiones</option>
-      </select>
-      <select id="off-filter-status" onchange="filterOffice()">
-        <option value="">Todos los estados</option>
-        <option value="active">Activos</option>
-        <option value="cancelled">Anulados</option>
-      </select>
+
+    <!-- KPIs -->
+    <div class="stats-grid-4">
+      <div class="stat-card-sm"><div class="stat-num" id="rpt-total">—</div><div class="stat-lbl">Viajes totales</div></div>
+      <div class="stat-card-sm accent-green"><div class="stat-num" id="rpt-m3">—</div><div class="stat-lbl">m³ movidos</div></div>
+      <div class="stat-card-sm accent-blue"><div class="stat-num" id="rpt-trucks">—</div><div class="stat-lbl">Camiones activos</div></div>
+      <div class="stat-card-sm accent-red"><div class="stat-num" id="rpt-cancelled">—</div><div class="stat-lbl">Anulados</div></div>
     </div>
-    <div id="office-list" class="card" style="padding:8px 14px">
-      <div style="text-align:center;color:var(--text-muted);font-size:13px;padding:12px 0">Cargando movimientos...</div>
+
+    <!-- TABS DE VISTA -->
+    <div class="card" style="padding:0 14px 14px">
+      <div class="report-tabs">
+        <div class="report-tab active" data-tab="movements" onclick="switchTab('movements')">Movimientos</div>
+        <div class="report-tab"        data-tab="trucks"    onclick="switchTab('trucks')">Camiones</div>
+        <div class="report-tab"        data-tab="materials" onclick="switchTab('materials')">Materiales</div>
+        <div class="report-tab"        data-tab="suppliers" onclick="switchTab('suppliers')">Suplidores</div>
+      </div>
+
+      <!-- TAB: MOVIMIENTOS -->
+      <div id="tab-movements">
+        <div class="filter-row" style="margin-bottom:10px">
+          <select id="off-filter-truck" onchange="filterOffice()" style="font-size:13px">
+            <option value="">Todos los camiones</option>
+          </select>
+          <select id="off-filter-status" onchange="filterOffice()" style="font-size:13px">
+            <option value="">Todos</option>
+            <option value="active">Activos</option>
+            <option value="cancelled">Anulados</option>
+          </select>
+        </div>
+        <div id="office-list">
+          <div class="report-loading">Cargando movimientos...</div>
+        </div>
+      </div>
+
+      <!-- TAB: POR CAMIÓN -->
+      <div id="tab-trucks" style="display:none">
+        <div id="rpt-trucks-content"><div class="report-loading">Cargando...</div></div>
+      </div>
+
+      <!-- TAB: POR MATERIAL -->
+      <div id="tab-materials" style="display:none">
+        <div id="rpt-materials-content"><div class="report-loading">Cargando...</div></div>
+      </div>
+
+      <!-- TAB: POR SUPLIDOR -->
+      <div id="tab-suppliers" style="display:none">
+        <div id="rpt-suppliers-content"><div class="report-loading">Cargando...</div></div>
+      </div>
     </div>
+
     <button class="btn btn-secondary" onclick="exportCSV()">📥 Exportar CSV</button>
   </div>
 </div>
@@ -1002,77 +1091,303 @@ async function cancelTicket() {
 // ================================================================
 // PANEL OFICINA
 // ================================================================
+// ================================================================
+// REPORTES — Estado
+// ================================================================
 let officeMovements = [];
+let currentDateRange = 'today';
+let currentTab = 'movements';
+
+function setDateRange(range) {
+  currentDateRange = range;
+  document.querySelectorAll('.date-tab').forEach(b => b.classList.toggle('active', b.dataset.range === range));
+  document.getElementById('custom-range-row').style.display = range === 'custom' ? 'flex' : 'none';
+  if (range !== 'custom') loadOfficeData();
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.report-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  ['movements','trucks','materials','suppliers'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  renderCurrentTab();
+}
+
+function getDateRange() {
+  const today = todayStr();
+  if (currentDateRange === 'today')     return { from: today, to: today };
+  if (currentDateRange === 'yesterday') {
+    const y = new Date(); y.setDate(y.getDate()-1);
+    const ys = y.toISOString().slice(0,10);
+    return { from: ys, to: ys };
+  }
+  if (currentDateRange === 'week') {
+    const d = new Date(); d.setDate(d.getDate()-6);
+    return { from: d.toISOString().slice(0,10), to: today };
+  }
+  if (currentDateRange === 'month') {
+    const d = new Date(); d.setDate(d.getDate()-29);
+    return { from: d.toISOString().slice(0,10), to: today };
+  }
+  if (currentDateRange === 'custom') {
+    const from = document.getElementById('rpt-date-from').value || today;
+    const to   = document.getElementById('rpt-date-to').value   || today;
+    return { from, to };
+  }
+  return { from: today, to: today };
+}
 
 async function loadOfficeData() {
-  const movements = await dbGetAll('movements_local');
-  const today = todayStr();
-  officeMovements = movements.filter(m => m.date === today);
+  document.getElementById('office-list').innerHTML = '<div class="report-loading">Cargando...</div>';
+
+  const { from, to } = getDateRange();
+  const label = from === to ? from : from + ' → ' + to;
+  document.getElementById('rpt-subtitle').textContent = label;
+
+  // Cargar desde Supabase si hay conexión
+  if (sb && navigator.onLine) {
+    try {
+      // Traer movimientos + tickets en paralelo
+      const [movRes, tktRes] = await Promise.all([
+        sb.from('movements')
+          .select('id,local_id,departure_time,status,quantity,unit,truck_id,driver_id,movement_type_id,material_id,origin_id,destination_id,user_id')
+          .gte('departure_time', from + 'T00:00:00')
+          .lte('departure_time', to   + 'T23:59:59')
+          .order('departure_time', { ascending: false }),
+        sb.from('tickets')
+          .select('movement_id,ticket_number')
+          .gte('created_at', from + 'T00:00:00')
+          .lte('created_at', to   + 'T23:59:59'),
+      ]);
+
+      if (!movRes.error && movRes.data) {
+        const tktMap = {};
+        (tktRes.data || []).forEach(t => { tktMap[t.movement_id] = t.ticket_number; });
+
+        const md = state.masterData;
+        const find = (arr, id) => arr.find(x => x.id === id);
+
+        officeMovements = movRes.data.map(m => {
+          const truck  = find(md.trucks, m.truck_id)        || {};
+          const sup    = find(md.suppliers, truck.supplier_id) || {};
+          const driver = find(md.drivers, m.driver_id)      || {};
+          const mtype  = find(md.movementTypes, m.movement_type_id) || {};
+          const mat    = find(md.materials, m.material_id)  || {};
+          const orig   = find(md.locations, m.origin_id)    || {};
+          const dest   = find(md.locations, m.destination_id) || {};
+          const user   = find(md.users, m.user_id)          || {};
+          return {
+            local_id:           m.local_id || m.id,
+            ticket_number:      tktMap[m.id] || '—',
+            truck_code:         truck.code        || '—',
+            truck_plate:        truck.plate       || '—',
+            supplier_name:      sup.name          || '—',
+            driver_name:        driver.name       || '—',
+            movement_type_name: mtype.name        || '—',
+            material_name:      mat.name          || '—',
+            origin_name:        orig.name         || '—',
+            destination_name:   dest.name         || '—',
+            user_name:          user.name         || '—',
+            quantity:           m.quantity,
+            unit:               m.unit || 'm3',
+            departure_time:     m.departure_time,
+            status:             m.status,
+            synced:             true,
+            date:               m.departure_time?.slice(0,10) || '',
+          };
+        });
+        updateKPIs();
+        renderCurrentTab();
+        return;
+      }
+    } catch(e) { console.warn('Supabase report error:', e); }
+  }
+
+  // Fallback: IndexedDB local
+  const all = await dbGetAll('movements_local');
+  officeMovements = all.filter(m => m.date >= from && m.date <= to);
   officeMovements.sort((a,b) => new Date(b.departure_time) - new Date(a.departure_time));
+  updateKPIs();
+  renderCurrentTab();
+}
 
-  const total     = officeMovements.filter(m=>m.status!=='cancelled').length;
-  const cancelled = officeMovements.filter(m=>m.status==='cancelled').length;
-  document.getElementById('off-total').textContent     = total;
-  document.getElementById('off-cancelled').textContent = cancelled;
+function resolveSupplierName(supplierId) {
+  if (!supplierId) return null;
+  const s = (state.masterData.suppliers || []).find(s => s.id === supplierId);
+  return s?.name || null;
+}
 
-  // Poblar filtro de camiones
+function updateKPIs() {
+  const active    = officeMovements.filter(m => m.status !== 'cancelled');
+  const cancelled = officeMovements.filter(m => m.status === 'cancelled');
+  const m3        = active.reduce((s, m) => s + (parseFloat(m.quantity) || 0), 0);
+  const trucks    = new Set(active.map(m => m.truck_code)).size;
+
+  document.getElementById('rpt-total').textContent     = active.length;
+  document.getElementById('rpt-m3').textContent        = m3 > 0 ? m3.toFixed(1) : '—';
+  document.getElementById('rpt-trucks').textContent    = trucks || '—';
+  document.getElementById('rpt-cancelled').textContent = cancelled.length;
+
+  // Filtro de camiones
   const truckFilter = document.getElementById('off-filter-truck');
-  const currentVal  = truckFilter.value;
+  const prev = truckFilter.value;
   truckFilter.innerHTML = '<option value="">Todos los camiones</option>';
-  const codes = [...new Set(officeMovements.map(m=>m.truck_code))];
-  codes.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c; opt.textContent = c;
-    if (c === currentVal) opt.selected = true;
-    truckFilter.appendChild(opt);
+  [...new Set(officeMovements.map(m=>m.truck_code))].forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    if (c === prev) o.selected = true;
+    truckFilter.appendChild(o);
   });
-
-  renderOfficeList(officeMovements);
 }
 
-function filterOffice() {
-  const truckFilter  = document.getElementById('off-filter-truck').value;
-  const statusFilter = document.getElementById('off-filter-status').value;
-  let filtered = officeMovements;
-  if (truckFilter)  filtered = filtered.filter(m => m.truck_code === truckFilter);
-  if (statusFilter) filtered = filtered.filter(m => m.status     === statusFilter);
-  renderOfficeList(filtered);
+function renderCurrentTab() {
+  if (currentTab === 'movements') renderMovementsTab();
+  if (currentTab === 'trucks')    renderTrucksTab();
+  if (currentTab === 'materials') renderMaterialsTab();
+  if (currentTab === 'suppliers') renderSuppliersTab();
 }
 
-function renderOfficeList(movements) {
+function filterOffice() { renderMovementsTab(); }
+
+function renderMovementsTab() {
+  const tf = document.getElementById('off-filter-truck').value;
+  const sf = document.getElementById('off-filter-status').value;
+  let list = officeMovements;
+  if (tf) list = list.filter(m => m.truck_code === tf);
+  if (sf) list = list.filter(m => m.status     === sf);
+
   const container = document.getElementById('office-list');
-  if (!movements.length) {
-    container.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:16px 0">Sin movimientos para mostrar</div>';
+  if (!list.length) {
+    container.innerHTML = '<div class="report-loading">Sin movimientos para mostrar</div>';
     return;
   }
-  container.innerHTML = movements.map(m => `
-    <div class="trip-item">
-      <div class="trip-top">
-        <span class="trip-id">${m.ticket_number} · ${m.truck_code}</span>
+  container.innerHTML = list.map(m => `
+    <div class="trip-item-full">
+      <div class="trip-header">
+        <span class="trip-tkt">${m.ticket_number}</span>
         <span class="tag ${m.status==='cancelled'?'tag-cancel':m.synced?'tag-ok':'tag-pending'}">
-          ${m.status==='cancelled'?'Anulado':m.synced?'Sync':'Pendiente'}
+          ${m.status==='cancelled'?'Anulado':m.synced?'✓ Sync':'Pendiente'}
         </span>
       </div>
-      <div class="trip-detail">${m.material_name} · ${m.origin_name} → ${m.destination_name}</div>
-      <div class="trip-detail">${fmtDatetime(m.departure_time)} · ${m.user_name}</div>
+      <div class="trip-truck">${m.truck_code} · ${m.truck_plate} · ${m.supplier_name}</div>
+      <div class="trip-route">${m.material_name} · ${m.origin_name} → ${m.destination_name}</div>
+      <div class="trip-meta">${fmtDatetime(m.departure_time)} · Listero: ${m.user_name}${m.quantity ? ' · ' + m.quantity + ' ' + m.unit : ''}</div>
+    </div>
+  `).join('');
+}
+
+function renderTrucksTab() {
+  const active = officeMovements.filter(m => m.status !== 'cancelled');
+  const grouped = {};
+  active.forEach(m => {
+    if (!grouped[m.truck_code]) grouped[m.truck_code] = { plate: m.truck_plate, supplier: m.supplier_name, trips: 0, m3: 0 };
+    grouped[m.truck_code].trips++;
+    grouped[m.truck_code].m3 += parseFloat(m.quantity) || 0;
+  });
+  const rows = Object.entries(grouped).sort((a,b) => b[1].trips - a[1].trips);
+  const max  = rows[0]?.[1].trips || 1;
+
+  const container = document.getElementById('rpt-trucks-content');
+  if (!rows.length) { container.innerHTML = '<div class="report-loading">Sin datos</div>'; return; }
+  container.innerHTML = rows.map(([code, d]) => `
+    <div class="summary-row">
+      <div>
+        <div class="summary-name">${code} · ${d.plate}</div>
+        <div class="summary-sub">${d.supplier}</div>
+        <div class="bar-chart-row" style="margin-top:6px">
+          <div class="bar-chart-track"><div class="bar-chart-fill" style="width:${Math.round(d.trips/max*100)}%"></div></div>
+        </div>
+      </div>
+      <div class="summary-count">
+        <div class="num">${d.trips}</div>
+        <div class="lbl">viajes</div>
+        ${d.m3 > 0 ? `<div class="lbl" style="margin-top:2px">${d.m3.toFixed(1)} m³</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderMaterialsTab() {
+  const active = officeMovements.filter(m => m.status !== 'cancelled');
+  const grouped = {};
+  active.forEach(m => {
+    if (!grouped[m.material_name]) grouped[m.material_name] = { trips: 0, m3: 0 };
+    grouped[m.material_name].trips++;
+    grouped[m.material_name].m3 += parseFloat(m.quantity) || 0;
+  });
+  const rows = Object.entries(grouped).sort((a,b) => b[1].trips - a[1].trips);
+  const max  = rows[0]?.[1].trips || 1;
+
+  const container = document.getElementById('rpt-materials-content');
+  if (!rows.length) { container.innerHTML = '<div class="report-loading">Sin datos</div>'; return; }
+  container.innerHTML = rows.map(([name, d]) => `
+    <div class="summary-row">
+      <div style="flex:1">
+        <div class="summary-name">${name}</div>
+        <div class="bar-chart-row" style="margin-top:6px">
+          <div class="bar-chart-track"><div class="bar-chart-fill" style="width:${Math.round(d.trips/max*100)}%;background:var(--success)"></div></div>
+        </div>
+      </div>
+      <div class="summary-count">
+        <div class="num">${d.trips}</div>
+        <div class="lbl">viajes</div>
+        ${d.m3 > 0 ? `<div class="lbl" style="margin-top:2px">${d.m3.toFixed(1)} m³</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderSuppliersTab() {
+  const active = officeMovements.filter(m => m.status !== 'cancelled');
+  const grouped = {};
+  active.forEach(m => {
+    const key = m.supplier_name || 'Sin suplidor';
+    if (!grouped[key]) grouped[key] = { trips: 0, m3: 0, trucks: new Set() };
+    grouped[key].trips++;
+    grouped[key].m3 += parseFloat(m.quantity) || 0;
+    grouped[key].trucks.add(m.truck_code);
+  });
+  const rows = Object.entries(grouped).sort((a,b) => b[1].trips - a[1].trips);
+  const max  = rows[0]?.[1].trips || 1;
+
+  const container = document.getElementById('rpt-suppliers-content');
+  if (!rows.length) { container.innerHTML = '<div class="report-loading">Sin datos</div>'; return; }
+  container.innerHTML = rows.map(([name, d]) => `
+    <div class="summary-row">
+      <div style="flex:1">
+        <div class="summary-name">${name}</div>
+        <div class="summary-sub">${d.trucks.size} camión${d.trucks.size!==1?'es':''}: ${[...d.trucks].join(', ')}</div>
+        <div class="bar-chart-row" style="margin-top:6px">
+          <div class="bar-chart-track"><div class="bar-chart-fill" style="width:${Math.round(d.trips/max*100)}%;background:var(--warning)"></div></div>
+        </div>
+      </div>
+      <div class="summary-count">
+        <div class="num">${d.trips}</div>
+        <div class="lbl">viajes</div>
+        ${d.m3 > 0 ? `<div class="lbl" style="margin-top:2px">${d.m3.toFixed(1)} m³</div>` : ''}
+      </div>
     </div>
   `).join('');
 }
 
 function exportCSV() {
-  const headers = ['Ticket','Camion','Placa','Suplidor','Chofer','Material','Origen','Destino','Cantidad','Unidad','Fecha','Listero','Estado'];
+  if (!officeMovements.length) { toast('Sin datos para exportar'); return; }
+  const { from, to } = getDateRange();
+  const headers = ['Ticket','Camion','Placa','Suplidor','Chofer','Tipo','Material','Origen','Destino','Cantidad','Unidad','Fecha','Listero','Estado'];
   const rows = officeMovements.map(m => [
     m.ticket_number, m.truck_code, m.truck_plate, m.supplier_name, m.driver_name,
-    m.material_name, m.origin_name, m.destination_name,
+    m.movement_type_name, m.material_name, m.origin_name, m.destination_name,
     m.quantity||'', m.unit||'', fmtDatetime(m.departure_time), m.user_name, m.status
   ]);
   const csv = [headers, ...rows].map(r => r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href = url; a.download = 'movimientos_' + todayStr() + '.csv';
+  a.href = url; a.download = 'movimientos_' + from + (from!==to?'_a_'+to:'') + '.csv';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  toast('CSV exportado');
+  URL.revokeObjectURL(url);
+  toast('CSV exportado (' + officeMovements.length + ' registros)');
 }
 
 // ================================================================
