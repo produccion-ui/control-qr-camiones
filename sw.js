@@ -2,7 +2,7 @@
 // SERVICE WORKER — Control QR Camiones
 // Permite que la app funcione completamente sin internet
 // ================================================================
-const CACHE_NAME = 'qr-camiones-v2';
+const CACHE_NAME = 'qr-camiones-v3';
 const ASSETS = [
   './',
   './index.html',
